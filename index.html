@@ -21,6 +21,7 @@
 <meta property="og:type" content="website">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <!-- Firebase SDKs (compat version — works in plain HTML, no build tools needed) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -303,8 +304,8 @@
   .expense-name { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .expense-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
   .expense-amount { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; color: var(--red); flex-shrink: 0; }
-  .expense-delete { background: transparent; border: none; color: var(--text3); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; transition: all 0.15s; line-height: 1; }
-  .expense-delete:hover { color: var(--red); background: rgba(248,113,113,0.1); }
+  .expense-action-btn { background: transparent; border: none; cursor: pointer; font-size: 14px; padding: 6px 8px; border-radius: 4px; transition: all 0.15s; line-height: 1; opacity: 0.6; }
+  .expense-action-btn:hover { opacity: 1; background: rgba(255,255,255,0.06); }
 
   /* sync indicator */
   .sync-badge {
@@ -379,10 +380,31 @@
   .btn-save { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0d0f14; border: none; border-radius: var(--radius-sm); padding: 10px 20px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
   .btn-save:hover { opacity: 0.9; }
 
+  .btn-logout-settings { background: transparent; border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red); padding: 10px 20px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .btn-logout-settings:hover { background: rgba(248,113,113,0.1); border-color: var(--red); box-shadow: 0 2px 8px rgba(248,113,113,0.2); }
+
   .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
   .badge-green { background: rgba(52,211,153,0.15); color: var(--green); }
   .badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
   .badge-yellow { background: rgba(240,192,64,0.15); color: var(--accent); }
+  .import-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .import-tab { padding: 12px 16px; background: transparent; border: none; color: var(--text2); cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 700; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .import-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .import-content { display: none; }
+  .import-content.active { display: block; }
+  .paste-area { background: var(--bg); border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 20px; min-height: 120px; font-family: 'Lato', monospace; font-size: 13px; color: var(--text); resize: vertical; outline: none; transition: border-color 0.2s; }
+  .paste-area:focus { border-color: var(--accent); }
+  .paste-area::placeholder { color: var(--text3); }
+  .upload-area { background: var(--bg); border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .upload-area:hover { border-color: var(--accent); background: rgba(96,165,250,0.05); }
+  .upload-area.dragover { border-color: var(--blue); background: rgba(96,165,250,0.1); }
+  .extraction-result { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-top: 16px; }
+  .extraction-field { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .extraction-field:last-child { border-bottom: none; }
+  .extraction-field-label { font-size: 12px; color: var(--text2); font-weight: 700; text-transform: uppercase; }
+  .extraction-field-value { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text); }
+  .btn-use-extracted { background: var(--blue); color: #fff; border: none; border-radius: var(--radius-sm); padding: 10px 16px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 16px; width: 100%; transition: all 0.2s; }
+  .btn-use-extracted:hover { opacity: 0.9; }
 
   .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; color: var(--text); font-size: 14px; z-index: 300; display: none; align-items: center; gap: 8px; box-shadow: var(--shadow); }
   .toast.show { display: flex; animation: slideUp 0.3s ease; }
@@ -491,6 +513,7 @@
             <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
           </div>
           <button class="btn-add" onclick="openModal()">＋ Add Expense</button>
+          <button onclick="openImportModal()" style="background:rgba(96,165,250,0.2);color:var(--blue);border:1px solid var(--blue);padding:10px 20px;border-radius:8px;cursor:pointer;font-family:Syne;font-size:14px;font-weight:700;white-space:nowrap;transition:all 0.2s;">📷 Import</button>
         </div>
       </div>
       <div class="stat-grid">
@@ -628,16 +651,23 @@
         </div>
       </div>
       <button class="btn-save" onclick="saveSettings()">Save Settings</button>
+      <div class="settings-section" style="margin-top:28px;border-color:rgba(248,113,113,0.2);background:rgba(248,113,113,0.05);">
+        <div class="settings-section-title" style="color:var(--red);">🚪 Account</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div><div class="settings-row-label">Sign Out</div><div class="settings-row-desc">Log out of your account</div></div>
+          <button class="btn-logout-settings" onclick="logout()">Sign Out</button>
+        </div>
+      </div>
     </div>
 
   </div>
 </div>
 
-<!-- ADD EXPENSE MODAL -->
+<!-- ADD/EDIT EXPENSE MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Add New Expense</div>
+      <div class="modal-title" id="modal-title">Add New Expense</div>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="form-group">
@@ -676,11 +706,49 @@
       <label class="form-label">Note (optional)</label>
       <input class="form-input" type="text" id="exp-note" placeholder="Any additional notes...">
     </div>
-    <button class="btn-primary" id="add-expense-btn" onclick="addExpense()">Add Expense →</button>
+    <button class="btn-primary" id="add-expense-btn" onclick="addOrUpdateExpense()">Add Expense →</button>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- IMPORT EXPENSE MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal" style="width:520px;max-width:100%;">
+    <div class="modal-header">
+      <div class="modal-title">📷 Import Expense</div>
+      <button class="modal-close" onclick="closeImportModal()">✕</button>
+    </div>
+    <div class="import-tabs">
+      <button class="import-tab active" onclick="switchImportTab('paste')">📝 Paste Text</button>
+      <button class="import-tab" onclick="switchImportTab('image')">🖼️ Upload Image</button>
+    </div>
+    <div class="import-content active" id="paste-tab">
+      <label class="form-label">Paste receipt text or message</label>
+      <textarea class="paste-area" id="paste-input" placeholder="Paste text like: Uber Eats: $24.50 on 28 Mar 2026"></textarea>
+      <button class="btn-primary" onclick="extractFromText()" style="width:100%;margin-top:16px;">Extract Details</button>
+    </div>
+    <div class="import-content" id="image-tab">
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('image-input').click()">
+        <div style="font-size:32px;margin-bottom:12px;">📸</div>
+        <div style="font-size:14px;color:var(--text);font-weight:600;margin-bottom:4px;">Drop image here or click to upload</div>
+        <div style="font-size:12px;color:var(--text2);">PNG, JPG, or screenshot</div>
+      </div>
+      <input type="file" id="image-input" accept="image/*" style="display:none;" onchange="extractFromImage()">
+      <div id="ocr-progress" style="display:none;margin-top:16px;text-align:center;">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">Reading image...</div>
+        <div style="width:100%;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+          <div style="width:0%;height:100%;background:var(--blue);animation:progress 2s infinite;border-radius:2px;"></div>
+        </div>
+      </div>
+    </div>
+    <div id="extraction-results"></div>
+  </div>
+</div>
+
+<style>
+  @keyframes progress { 0% { width: 0%; } 50% { width: 70%; } 100% { width: 100%; } }
+</style>
 
 <script>
 // ═══════════════════════════════════════
@@ -1069,7 +1137,10 @@ function expenseItemHTML(e) {
       <div class="expense-meta">${e.category} · ${dateStr}${e.note ? ' · ' + e.note : ''}</div>
     </div>
     <div class="expense-amount">${fmt(e.amount)}</div>
-    <button class="expense-delete" onclick="deleteExpense('${e.id}')" title="Delete">✕</button>
+    <div style="display:flex;gap:6px;">
+      <button class="expense-action-btn" onclick="editExpense('${e.id}')" title="Edit" style="color:var(--blue)">✎</button>
+      <button class="expense-action-btn" onclick="deleteExpense('${e.id}')" title="Delete" style="color:var(--red)">✕</button>
+    </div>
   </div>`;
 }
 
@@ -1242,15 +1313,40 @@ async function saveSettings() {
 }
 
 // ═══════════════════════════════════════
-// ADD / DELETE EXPENSE (Firestore)
+// ADD / EDIT / DELETE EXPENSE (Firestore)
 // ═══════════════════════════════════════
+let editingExpenseId = null;
+
 function openModal() {
+  editingExpenseId = null;
+  document.getElementById('modal-title').textContent = 'Add New Expense';
+  document.getElementById('add-expense-btn').textContent = 'Add Expense →';
+  ['exp-desc','exp-amount','exp-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('exp-cat').value = 'Food & Dining';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('exp-desc').focus();
+}
+
+function editExpense(id) {
+  const expense = state.expenses.find(e => e.id === id);
+  if (!expense) return;
+  
+  editingExpenseId = id;
+  document.getElementById('modal-title').textContent = 'Edit Expense';
+  document.getElementById('add-expense-btn').textContent = 'Update Expense →';
+  document.getElementById('exp-desc').value = expense.description;
+  document.getElementById('exp-amount').value = expense.amount;
+  document.getElementById('exp-date').value = expense.date;
+  document.getElementById('exp-cat').value = expense.category;
+  document.getElementById('exp-note').value = expense.note || '';
   document.getElementById('modal').classList.add('open');
   document.getElementById('exp-desc').focus();
 }
 
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
+  editingExpenseId = null;
   ['exp-desc','exp-amount','exp-note'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
 }
@@ -1259,7 +1355,7 @@ document.getElementById('modal').addEventListener('click', e => {
   if (e.target === document.getElementById('modal')) closeModal();
 });
 
-async function addExpense() {
+async function addOrUpdateExpense() {
   const desc     = document.getElementById('exp-desc').value.trim();
   const amount   = parseFloat(document.getElementById('exp-amount').value);
   const date     = document.getElementById('exp-date').value;
@@ -1274,17 +1370,28 @@ async function addExpense() {
   setSyncing(true);
 
   try {
-    await db.collection('users').doc(state.uid).collection('expenses').add({
-      description: desc, amount, date, category, note,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    closeModal();
-    showToast('✅ Expense saved to cloud!', 'success');
+    if (editingExpenseId) {
+      // Update existing expense
+      await db.collection('users').doc(state.uid).collection('expenses').doc(editingExpenseId).update({
+        description: desc, amount, date, category, note,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      closeModal();
+      showToast('✅ Expense updated!', 'success');
+    } else {
+      // Add new expense
+      await db.collection('users').doc(state.uid).collection('expenses').add({
+        description: desc, amount, date, category, note,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      closeModal();
+      showToast('✅ Expense saved to cloud!', 'success');
+    }
   } catch (err) {
     showToast('❌ Failed to save. Check connection.', 'error');
     setSyncError();
   } finally {
-    btn.disabled = false; btn.textContent = 'Add Expense →';
+    btn.disabled = false; btn.textContent = editingExpenseId ? 'Update Expense →' : 'Add Expense →';
   }
 }
 
@@ -1378,4 +1485,167 @@ window.addEventListener('appinstalled', () => {
   showToast('🐝 BudgetBee installed successfully!', 'success');
   deferredInstallPrompt = null;
 });
+
+// ═══════════════════════════════════════
+// IMPORT EXPENSE FEATURE
+// ═══════════════════════════════════════
+let extractedData = null;
+
+function openImportModal() {
+  document.getElementById('import-modal').classList.add('open');
+  document.getElementById('paste-input').value = '';
+  document.getElementById('extraction-results').innerHTML = '';
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+  extractedData = null;
+  document.getElementById('ocr-progress').style.display = 'none';
+}
+
+function switchImportTab(tab) {
+  document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.import-content').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(tab + '-tab').classList.add('active');
+  document.getElementById('extraction-results').innerHTML = '';
+}
+
+function extractFromText() {
+  const text = document.getElementById('paste-input').value.trim();
+  if (!text) { showToast('⚠️ Please paste some text', 'error'); return; }
+  
+  // Extract amount
+  const amountMatch = text.match(/[\$₹\€](\d+(?:[.,]\d{2})?)|(?:\d+(?:[.,]\d{2})?\s*(?:₹|\$|€|rupee|usd|inr))/i);
+  const amount = amountMatch ? parseFloat(amountMatch[1] || amountMatch[0].replace(/[^0-9.]/g, '')) : null;
+  
+  // Extract date
+  const dateMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})[,\s]+(\d{4})|today|tomorrow|yesterday/i);
+  let date = null;
+  if (dateMatch) {
+    if (dateMatch[1]) {
+      const d = new Date(dateMatch[3], parseInt(dateMatch[2])-1, dateMatch[1]);
+      date = d.toISOString().split('T')[0];
+    } else if (dateMatch[4]) {
+      const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+      const m = months.indexOf(dateMatch[2].toLowerCase().substring(0,3));
+      const d = new Date(dateMatch[5], m, dateMatch[4]);
+      date = d.toISOString().split('T')[0];
+    } else if (dateMatch[0].toLowerCase() === 'today') {
+      date = new Date().toISOString().split('T')[0];
+    }
+  }
+  if (!date) date = new Date().toISOString().split('T')[0];
+  
+  // Extract category
+  const categoryKeywords = {
+    'Food & Dining': ['food', 'eat', 'restaurant', 'cafe', 'lunch', 'dinner', 'breakfast', 'pizza', 'burger', 'uber eats', 'zomato', 'swiggy'],
+    'Transport': ['uber', 'taxi', 'gas', 'petrol', 'fuel', 'carpool', 'metro', 'bus', 'train', 'flight'],
+    'Shopping': ['shop', 'buy', 'amazon', 'mall', 'store', 'clothes', 'dress', 'shoe'],
+    'Entertainment': ['movie', 'cinema', 'game', 'ticket', 'concert', 'show', 'netflix', 'spotify'],
+    'Health': ['doctor', 'hospital', 'medicine', 'pharmacy', 'gym', 'health', 'dental'],
+    'Education': ['school', 'college', 'book', 'course', 'tuition', 'education'],
+    'Bills & Utilities': ['bill', 'electric', 'water', 'internet', 'phone', 'utility'],
+    'Travel': ['hotel', 'airbnb', 'vacation', 'flight', 'trip', 'travel'],
+    'Personal Care': ['salon', 'haircut', 'spa', 'beauty', 'personal'],
+  };
+  
+  let category = 'Other';
+  const lowerText = text.toLowerCase();
+  for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+    if (keywords.some(kw => lowerText.includes(kw))) {
+      category = cat;
+      break;
+    }
+  }
+  
+  // Extract description
+  const descMatch = text.match(/(?:for|at|from)\s+([^0-9\$₹]{10,50})|([a-z]{5,}\s+[a-z]{3,})/i);
+  const description = descMatch ? (descMatch[1] || descMatch[2]).trim() : 'Imported Expense';
+  
+  extractedData = { amount, date, category, description };
+  displayExtractedData();
+}
+
+async function extractFromImage() {
+  const file = document.getElementById('image-input').files[0];
+  if (!file) return;
+  
+  document.getElementById('ocr-progress').style.display = 'block';
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const result = await Tesseract.recognize(e.target.result, 'eng');
+      document.getElementById('ocr-progress').style.display = 'none';
+      const extractedText = result.data.text;
+      document.getElementById('paste-input').value = extractedText;
+      extractFromText();
+    } catch (err) {
+      document.getElementById('ocr-progress').style.display = 'none';
+      showToast('❌ Failed to read image. Try pasting text instead.', 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function displayExtractedData() {
+  if (!extractedData) return;
+  const html = `
+    <div class="extraction-result">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">✓ Extracted Details</div>
+      <div class="extraction-field">
+        <span class="extraction-field-label">Amount</span>
+        <span class="extraction-field-value">${extractedData.amount ? fmt(extractedData.amount) : '—'}</span>
+      </div>
+      <div class="extraction-field">
+        <span class="extraction-field-label">Date</span>
+        <span class="extraction-field-value">${extractedData.date || '—'}</span>
+      </div>
+      <div class="extraction-field">
+        <span class="extraction-field-label">Category</span>
+        <span class="extraction-field-value">${extractedData.category}</span>
+      </div>
+      <div class="extraction-field">
+        <span class="extraction-field-label">Description</span>
+        <span class="extraction-field-value">${extractedData.description}</span>
+      </div>
+      <button class="btn-use-extracted" onclick="useExtractedData()">✓ Use This Data & Add Expense</button>
+    </div>
+  `;
+  document.getElementById('extraction-results').innerHTML = html;
+}
+
+function useExtractedData() {
+  if (!extractedData) return;
+  document.getElementById('exp-desc').value = extractedData.description;
+  document.getElementById('exp-amount').value = extractedData.amount || '';
+  document.getElementById('exp-date').value = extractedData.date;
+  document.getElementById('exp-cat').value = extractedData.category;
+  document.getElementById('exp-note').value = '(Imported from text)';
+  closeImportModal();
+  editingExpenseId = null;
+  document.getElementById('modal-title').textContent = 'Add New Expense';
+  document.getElementById('add-expense-btn').textContent = 'Add Expense →';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('exp-desc').focus();
+}
+
+// Drag & drop for image upload
+const uploadArea = document.getElementById('upload-area');
+if (uploadArea) {
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('image-input').files = e.dataTransfer.files;
+      extractFromImage();
+    }
+  });
+}
 </script>
